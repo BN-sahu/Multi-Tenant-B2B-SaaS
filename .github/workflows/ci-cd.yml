@@ -7,10 +7,9 @@ on:
     branches: [ main ]
 
 env:
-  AWS_REGION: us-east-1
-  ECR_REPOSITORY_API: helpdesk-api
-  ECR_REPOSITORY_WEB: helpdesk-web
-  EKS_CLUSTER_NAME: helpdesk-cluster
+  REGISTRY: ghcr.io
+  IMAGE_NAME_API: ${{ github.repository }}-api
+  IMAGE_NAME_WEB: ${{ github.repository }}-web
 
 jobs:
   test-and-lint:
@@ -37,59 +36,46 @@ jobs:
     needs: test-and-lint
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      
     steps:
     - uses: actions/checkout@v4
     
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
+    - name: Log in to the Container registry
+      uses: docker/login-action@v3
       with:
-        aws-access-key-id: $
-        aws-secret-access-key: $
-        aws-region: $
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
         
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v2
-      
-    - name: Build, tag, and push API image to Amazon ECR
-      env:
-        ECR_REGISTRY: $
-        IMAGE_TAG: $
-      run: |
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_API:$IMAGE_TAG -f apps/api/Dockerfile .
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY_API:$IMAGE_TAG
-        
-    - name: Build, tag, and push Web image to Amazon ECR
-      env:
-        ECR_REGISTRY: $
-        IMAGE_TAG: $
-      run: |
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_WEB:$IMAGE_TAG -f apps/web/Dockerfile .
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY_WEB:$IMAGE_TAG
-
-  deploy:
-    needs: build-and-push
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
+    - name: Extract metadata (tags, labels) for API
+      id: meta-api
+      uses: docker/metadata-action@v5
       with:
-        aws-access-key-id: $
-        aws-secret-access-key: $
-        aws-region: $
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_API }}
         
-    - name: Update Kubeconfig
-      run: aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
-      
-    - name: Deploy to Amazon EKS
-      env:
-        ECR_REGISTRY: $
-        IMAGE_TAG: $
-      run: |
-        # Substitute environment variables in k8s manifests
-        envsubst < infra/k8s/api-deployment.yaml | kubectl apply -f -
-        envsubst < infra/k8s/web-deployment.yaml | kubectl apply -f -
-        kubectl apply -f infra/k8s/ingress.yaml
+    - name: Build and push API image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: apps/api/Dockerfile
+        push: true
+        tags: ${{ steps.meta-api.outputs.tags }}
+        labels: ${{ steps.meta-api.outputs.labels }}
+        
+    - name: Extract metadata (tags, labels) for Web
+      id: meta-web
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_WEB }}
+        
+    - name: Build and push Web image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: apps/web/Dockerfile
+        push: true
+        tags: ${{ steps.meta-web.outputs.tags }}
+        labels: ${{ steps.meta-web.outputs.labels }}
