@@ -3,10 +3,9 @@ import { Pool } from 'pg';
 import { promises as fs } from 'fs';
 import {
   Kysely,
-  Migrator,
   PostgresDialect,
-  FileMigrationProvider,
 } from 'kysely';
+const { Migrator, FileMigrationProvider } = require('kysely/migration');
 import { DB } from './schema';
 
 async function migrateToLatest() {
@@ -29,7 +28,7 @@ async function migrateToLatest() {
 
   const { error, results } = await migrator.migrateToLatest();
 
-  results?.forEach((it) => {
+  results?.forEach((it: any) => {
     if (it.status === 'Success') {
       console.log(`migration "${it.migrationName}" was executed successfully`);
     } else if (it.status === 'Error') {

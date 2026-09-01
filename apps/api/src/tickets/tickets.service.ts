@@ -17,6 +17,7 @@ export class TicketsService {
         description: data.description,
         customer_id: data.customerId,
         priority: data.priority,
+        status: 'OPEN',
       })
       .returningAll()
       .executeTakeFirst();

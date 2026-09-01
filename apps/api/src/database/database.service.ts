@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Scope, Inject } from '@nestjs/common';
-import { Kysely, PostgresDialect } from 'kysely';
+import { Kysely, PostgresDialect, sql } from 'kysely';
 import { Pool } from 'pg';
 import { DB } from './schema';
 import { REQUEST } from '@nestjs/core';
@@ -36,7 +36,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 
     return this.db.transaction().execute(async (trx) => {
       // Set the local transaction variable for RLS
-      await trx.raw(`SET LOCAL app.tenant_id = '${activeTenantId}'`).execute();
+      await sql`SET LOCAL app.tenant_id = ${activeTenantId}`.execute(trx);
       return trx;
     });
   }
