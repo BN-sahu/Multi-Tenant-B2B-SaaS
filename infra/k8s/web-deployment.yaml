@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: helpdesk-web
+  labels:
+    app: helpdesk-web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: helpdesk-web
+  template:
+    metadata:
+      labels:
+        app: helpdesk-web
+    spec:
+      containers:
+      - name: web
+        image: ${ECR_REGISTRY}/helpdesk-web:${IMAGE_TAG}
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NEXT_PUBLIC_API_URL
+          value: "https://api.helpdesk.example.com"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "250m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: helpdesk-web-svc
+spec:
+  type: ClusterIP
+  selector:
+    app: helpdesk-web
+  ports:
+  - port: 80
+    targetPort: 3000
